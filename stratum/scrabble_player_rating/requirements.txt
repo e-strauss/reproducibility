@@ -1,0 +1,6 @@
+numpy
+pandas==3.0.0
+skrub==0.6.2
+scikit-learn==1.8.0
+xgboost
+git+ssh://git@github.com/deem-data/sempipes.git@1110827
