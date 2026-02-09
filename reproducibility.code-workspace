@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"name": "📁 Root",
+			"path": "."
+		},
+		{
+			"name": "🎯 Scrabble Player Rating",
+			"path": "./stratum/scrabble_player_rating"
+		}
+	],
+	"settings": {
+		"python.terminal.activateEnvironment": true,
+		"files.exclude": {
+			"**/.venv": true,
+			"**/venv": true,
+			"**/__pycache__": true,
+			"**/*.pyc": true
+		},
+		"files.watcherExclude": {
+			"**/.venv/**": true,
+			"**/venv/**": true
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"ms-python.vscode-pylance"
+		]
+	}
+}
