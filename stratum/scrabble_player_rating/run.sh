@@ -7,17 +7,27 @@ if ! command -v uv &> /dev/null; then
     export PATH="$HOME/.cargo/bin:$PATH"
 fi
 
-# Create venv and install dependencies in one command
+# Create venv w/ python 3.12 and install dependencies in one command
 # uv handles venv creation automatically if it doesn't exist
-uv venv
+uv venv --python 3.12
 
 # Install dependencies from requirements.txt
-# Use --locked if you have a uv.lock file for exact reproducibility
+# Use uv.lock if available for exact reproducibility (created from current .venv)
 if [ -f "uv.lock" ]; then
-    uv pip install --locked
+    uv pip install -r uv.lock
 else
     uv pip install -r requirements.txt
 fi
 
 # Activate venv for subsequent commands
 source .venv/bin/activate
+
+# make data folder if it doesn't exist
+mkdir -p data
+
+# if the data folder is empty, download the data
+if [ -z "$(ls -A data)" ]; then
+    kaggle competitions download -c scrabble-player-rating
+    unzip scrabble-player-rating.zip -d data/
+    rm scrabble-player-rating.zip
+fi

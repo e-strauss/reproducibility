@@ -2,55 +2,30 @@ import warnings
 
 import lightgbm as lgb
 import pandas as pd
-import skrub
-from scipy.special import boxcox, inv_boxcox  # pylint: disable=no-name-in-module
-from sklearn.base import BaseEstimator, RegressorMixin
+import stratum as skrub
+from scipy.special import boxcox  # pylint: disable=no-name-in-module
 from sklearn.ensemble import ExtraTreesRegressor, GradientBoostingRegressor, RandomForestRegressor
 
 import sempipes  # pylint: disable=unused-import
 
 warnings.filterwarnings("ignore")
 
+nl_prompt="""
+Create additional features that could help predict the rating of a player. The two players for a game can be found by checking the rows with the same game_id.
 
-class EnsembleRegressor(BaseEstimator, RegressorMixin):
-    def __init__(self):
-        self.model1 = ExtraTreesRegressor(random_state=42)
-        self.model2 = lgb.LGBMRegressor(
-            learning_rate=0.08797697229790209,
-            num_leaves=12,
-            min_child_samples=2,
-            subsample=0.29682698086764914,
-            colsample_bytree=0.2789636201075709,
-            verbosity=-1,
-            random_state=42,
-        )
-        self.model3 = RandomForestRegressor(random_state=42)
-        self.model4 = GradientBoostingRegressor(learning_rate=0.01, n_estimators=800, max_depth=6, random_state=42)
+Definitely include the following:
+    - the average time spent on each turn
+    - the average points per second
+    - a binary feature indicating whether the rating_mode is RATED or not
+    - a binary feature indicating whether the game_end_reason is STANDARD or not
+    - a binary feature indicating whether the time_control_name is regular or not
+"""
 
-    def fit(self, X, y):
-        self.model1.fit(X, y)
-        self.model2.fit(X, y)
-        self.model3.fit(X, y)
-        self.model4.fit(X, y)
-        return self
-
-    def predict(self, X):
-        p_extreg = inv_boxcox(self.model1.predict(X), -1.4)
-        p_lgbm = inv_boxcox(self.model2.predict(X), -1.4)
-        p_ranforeg = inv_boxcox(self.model3.predict(X), -1.4)
-        p_graboor = inv_boxcox(self.model4.predict(X), -1.4)
-        p_ensemble = (p_extreg + p_lgbm + p_ranforeg + p_graboor) / 4.0
-        return p_ensemble
-
-
-def sempipes_pipeline2(data_file):
-    games_df = pd.read_csv("experiments/scrabble_player_rating/games.csv")
-    turns_df = pd.read_csv("experiments/scrabble_player_rating/turns.csv.gz")
-    data_df = pd.read_csv(data_file)
-
-    games = skrub.var("games", games_df)
-    df_turns = skrub.var("turns", turns_df)
-    data = skrub.var("data", data_df).skb.subsample(n=100)
+def sempipes_pipeline2(data_file=None, n_choices=1):
+    games = skrub.var("games", "data/games.csv").skb.apply_func(pd.read_csv)
+    df_turns = skrub.var("turns", "data/turns.csv").skb.apply_func(pd.read_csv)
+    data = skrub.var("data_file", data_file) if data_file else skrub.var("data_file")
+    data = data.skb.apply_func(pd.read_csv)
 
     data = data.merge(games, on="game_id", how="inner")
 
@@ -111,9 +86,8 @@ def sempipes_pipeline2(data_file):
     data = data.skb.apply_func(add_other)
     data = data[~data.nickname.str.endswith("Bot")]
 
-    X_d = data.skb.mark_as_X()
-    y = X_d["rating"].skb.mark_as_y().skb.apply_func(lambda y: boxcox(y, -1.4))
-    X_d = X_d.drop(columns=["rating"])
+    y = data["rating"].skb.mark_as_y().skb.apply_func(lambda y: boxcox(y, -1.4))
+    X_d = data.drop(columns=["rating"]).skb.mark_as_X()
 
     Xvariaveis = [
         "score",
@@ -136,26 +110,42 @@ def sempipes_pipeline2(data_file):
         "game_end_reason",
     ]
     X_d = X_d[Xvariaveis]
-
-    X_d = X_d.sem_gen_features(
-        nl_prompt="""
-        Create additional features that could help predict the rating of a player. The two players for a game can be found by checking the rows with the same game_id.
-        
-        Definitely include the following:
-         - the average time spent on each turn
-         - the average points per second
-         - a binary feature indicating whether the rating_mode is RATED or not
-         - a binary feature indicating whether the game_end_reason is STANDARD or not
-         - a binary feature indicating whether the time_control_name is regular or not
-        
-        """,
-        name="player_features",
-        how_many=15,
-    )
+    if n_choices == 1:
+        X_d = X_d.sem_gen_features(name="player_features", nl_prompt=nl_prompt, how_many=15)
+    else:
+        pipelines = {f"iter:{i}": X_d.sem_gen_features(name=f"player_features_{i}", nl_prompt="empty", how_many=15) for i in range(n_choices)}
+        X_d = skrub.choose_from(pipelines, name="sempipes_iterations").as_data_op()
 
     X_d = X_d.skb.apply(skrub.TableVectorizer())
     X_d = X_d.fillna(-1)
     X_d = X_d.replace([float("inf"), -float("inf")], -1)
+    model1 = ExtraTreesRegressor(random_state=42)
+    model2a = lgb.LGBMRegressor(
+        learning_rate=0.08797697229790209,
+        num_leaves=12,
+        min_child_samples=2,
+        subsample=0.29682698086764914,
+        colsample_bytree=0.2789636201075709,
+        verbosity=-1,
+        random_state=42,
+    )
+    predictions = X_d.skb.apply(model2a, y=y)
+    # model2b = lgb.LGBMRegressor(random_state=42)
+    model3 = RandomForestRegressor(random_state=42)
 
-    predictions = X_d.skb.apply(EnsembleRegressor(), y=y)
+    model4a = GradientBoostingRegressor(learning_rate=0.01, n_estimators=100, max_depth=6, random_state=42)
+    # model4b = GradientBoostingRegressor(random_state=42)
+
+    pred1 = X_d.skb.apply(model1, y=y)
+    pred2a = X_d.skb.apply(model2a, y=y)
+    # pred2b = X_d.skb.apply(model2b, y=y)
+    # pred2 = skrub.choose_from([pred2a, pred2b], name="lgbm_model").as_data_op()
+    # pred2 = pred2a
+    pred3 = X_d.skb.apply(model3, y=y)
+    pred4a = X_d.skb.apply(model4a, y=y)
+    # pred4b = X_d.skb.apply(model4b, y=y)
+    # pred4 = skrub.choose_from([pred4a, pred4b], name="n_estm").as_data_op()
+    ensemble_pred = pred1.skb.apply_func(lambda x1, x2, x3, x4, mode: (x1 + x2 + x3 + x4) / 4.0 if mode != "fit" else -1, x2=pred2a, x3=pred3, x4=pred4a, mode=skrub.eval_mode())
+    # #predictions = skrub.choose_from({"ensemble": ensemble_pred, "lgbm": pred2b, "lgbm_special": pred2a}, name="ensemble_or_lgbm").as_data_op()
+    predictions = ensemble_pred
     return predictions
