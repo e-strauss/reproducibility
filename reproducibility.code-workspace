@@ -1,12 +1,16 @@
 {
 	"folders": [
 		{
-			"name": "📁 Root",
+			"name": "\ud83d\udcc1 Root",
 			"path": "."
 		},
 		{
-			"name": "🎯 Scrabble Player Rating",
+			"name": "\ud83c\udfaf Scrabble Player Rating",
 			"path": "./stratum/scrabble_player_rating"
+		},
+		{
+			"name": "\ud83c\udfaf Uk-Housing",
+			"path": "./stratum/uk-housing"
 		}
 	],
 	"settings": {
