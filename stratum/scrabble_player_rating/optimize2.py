@@ -2,14 +2,14 @@ import warnings
 import sempipes
 from utils import PlayerBasedFolds
 from _sempipes_impl2 import sempipes_pipeline2
-from sempipes.optimisers import optimise_colopro
+from sempipes.optimisers import MonteCarloTreeSearch, optimise_colopro
 
 warnings.filterwarnings("ignore")
 
 sempipes.update_config(
     llm_for_code_generation=sempipes.LLM(
         name="gemini/gemini-2.5-flash",
-        parameters={"temperature": 0.8},
+        parameters={"temperature": 1.8},
     ),
 )
 
@@ -22,6 +22,7 @@ outcomes = optimise_colopro(
     scoring="neg_root_mean_squared_error",
     cv=PlayerBasedFolds(3),
     pipeline_definition=sempipes_pipeline2,
+    search = MonteCarloTreeSearch(),
     run_name="optimize2"
 )
 
