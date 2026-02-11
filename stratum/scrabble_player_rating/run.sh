@@ -33,3 +33,6 @@ if [ -z "$(ls -A data)" ]; then
 else
     echo "Scrabble player data is already there"
 fi
+
+echo "Running sempipes optimization"
+python optimize2.py
