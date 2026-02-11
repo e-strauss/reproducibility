@@ -30,4 +30,6 @@ if [ -z "$(ls -A data)" ]; then
     kaggle competitions download -c scrabble-player-rating
     unzip scrabble-player-rating.zip -d data/
     rm scrabble-player-rating.zip
+else
+    echo "Scrabble player data is already there"
 fi

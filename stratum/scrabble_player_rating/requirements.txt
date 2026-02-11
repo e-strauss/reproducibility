@@ -4,3 +4,5 @@ xgboost
 jupyter
 kaggle
 git+ssh://git@github.com/deem-data/sempipes.git@0fd79c64e298fbf492b4d340fd2186b60b9dc54a
+# install stratum
+-e ../../../stratum # TODO move to requirements once we have fixed version
